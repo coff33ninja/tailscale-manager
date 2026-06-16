@@ -87,6 +87,10 @@ Checked in order:
 2. `%APPDATA%\tailscale-manager\.env` (or `~/.config/tailscale-manager/.env` on Linux/macOS)
 3. Project root `.env`
 
+## Known Issues
+
+See [known_bugs.md](known_bugs.md) for a full list of known bugs, security concerns, and code quality issues.
+
 ## License
 
 MIT
