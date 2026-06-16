@@ -1,6 +1,6 @@
 import flet as ft
 
-from .constants import NAV_ITEMS
+from .constants import NAV_ITEMS, ROUTES
 from .tailscale_cli import TailscaleCLI, get_tailscale_path
 from .views.dashboard import DashboardView
 from .views.peers import PeersView
@@ -38,16 +38,16 @@ def main(page: ft.Page):
     content_area = ft.Container(expand=True, padding=20)
 
     views = {
-        "/": DashboardView(cli),
-        "/peers": PeersView(cli),
-        "/exit-nodes": ExitNodesView(cli),
-        "/serve": ServeFunnelView(cli),
-        "/settings": SettingsView(cli),
-        "/acls": ACLsView(cli),
+        ROUTES["dashboard"]: DashboardView(cli),
+        ROUTES["peers"]: PeersView(cli),
+        ROUTES["exit_nodes"]: ExitNodesView(cli),
+        ROUTES["serve"]: ServeFunnelView(cli),
+        ROUTES["settings"]: SettingsView(cli),
+        ROUTES["acls"]: ACLsView(cli),
     }
 
     def _navigate(route: str):
-        content_area.content = views.get(route, views["/"])
+        content_area.content = views.get(route, views[ROUTES["dashboard"]])
         content_area.update()
         if content_area.content and hasattr(content_area.content, "load"):
             content_area.content.load()
@@ -89,4 +89,4 @@ def main(page: ft.Page):
         )
     )
 
-    _navigate("/")
+    _navigate(ROUTES["dashboard"])

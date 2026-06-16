@@ -1,11 +1,10 @@
 import flet as ft
 from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
-
+from ..widgets.status_card import status_card
 
 _RED = "#FF5252"
 _WHITE = "#FFFFFF"
 _GREY = "#9E9E9E"
-_GREY_LIGHT = "#BDBDBD"
 _CARD_BG = "#2A2A3E"
 _BORDER = "#3A3A5E"
 _WARN = "#FFB74D"
@@ -28,34 +27,25 @@ class DashboardView(ft.Column):
         try:
             status = self.cli.status()
 
-            def _card(title, value, subtitle=""):
-                return ft.Container(
-                    content=ft.Column([
-                        ft.Text(title, size=12, color=_GREY),
-                        ft.Text(value, size=20, weight=ft.FontWeight.BOLD, color=_WHITE),
-                        ft.Text(subtitle, size=11, color=_GREY_LIGHT, visible=bool(subtitle)),
-                    ], spacing=2, expand=True),
-                    padding=16,
-                    border_radius=10,
-                    bgcolor=_CARD_BG,
-                    border=ft.Border(left=ft.BorderSide(1, _BORDER), top=ft.BorderSide(1, _BORDER), right=ft.BorderSide(1, _BORDER), bottom=ft.BorderSide(1, _BORDER)),
-                    expand=True,
-                )
-
             row1 = ft.Row([
-                _card("Status", "Connected" if status.online else "Disconnected"),
-                _card("Device", status.device_name or "N/A"),
-                _card("IP", status.tailscale_ip[0] if status.tailscale_ip else "N/A",
-                      status.tailscale_ip[1] if len(status.tailscale_ip) > 1 else ""),
-                _card("Version", status.version or "N/A"),
+                status_card("Status", "Connected" if status.online else "Disconnected",
+                            icon="CHECK_CIRCLE" if status.online else "CANCEL",
+                            status="online" if status.online else "offline"),
+                status_card("Device", status.device_name or "N/A", icon="COMPUTER"),
+                status_card("Tailscale IPs", status.tailscale_ip[0] if status.tailscale_ip else "N/A",
+                            icon="DNS",
+                            subtitle=status.tailscale_ip[1] if len(status.tailscale_ip) > 1 else ""),
+                status_card("Version", status.version or "N/A", icon="BUILD"),
             ], spacing=10, expand=True)
 
             peers_online = sum(1 for p in status.peers if p["online"])
             row2 = ft.Row([
-                _card("Total Peers", str(len(status.peers))),
-                _card("Online", str(peers_online)),
-                _card("Offline", str(len(status.peers) - peers_online)),
-                _card("MagicDNS", "Enabled" if status.magic_dns else "Disabled"),
+                status_card("Total Peers", str(len(status.peers)), icon="PEOPLE"),
+                status_card("Online Peers", str(peers_online), icon="CHECK_CIRCLE", status="online"),
+                status_card("Offline Peers", str(len(status.peers) - peers_online),
+                            icon="CANCEL",
+                            status="offline" if peers_online < len(status.peers) else "online"),
+                status_card("MagicDNS", "Enabled" if status.magic_dns else "Disabled", icon="DNS"),
             ], spacing=10, expand=True)
 
             actions = ft.Container(
@@ -74,7 +64,8 @@ class DashboardView(ft.Column):
                 padding=15,
                 border_radius=10,
                 bgcolor=_CARD_BG,
-                border=ft.Border(left=ft.BorderSide(1, _BORDER), top=ft.BorderSide(1, _BORDER), right=ft.BorderSide(1, _BORDER), bottom=ft.BorderSide(1, _BORDER)),
+                border=ft.Border(left=ft.BorderSide(1, _BORDER), top=ft.BorderSide(1, _BORDER),
+                                 right=ft.BorderSide(1, _BORDER), bottom=ft.BorderSide(1, _BORDER)),
             )
 
             health = ft.Column()
