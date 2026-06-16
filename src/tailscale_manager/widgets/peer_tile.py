@@ -35,7 +35,9 @@ def _relative_time(ts: str) -> str:
         return ts
 
 
-def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_service=None, acls: list[dict] | None = None) -> ft.Container:
+def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_service=None,
+              acls: list[dict] | None = None, device_info: dict | None = None,
+              on_authorize=None, on_expire_key=None, on_edit_tags=None) -> ft.Container:
     is_online = peer.get("online", False)
     status = "online" if is_online else "offline"
     dot_color = STATUS_COLORS[status]
@@ -209,6 +211,67 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
                 padding=ft.Padding(left=0, top=4, right=0, bottom=0),
             )
         )
+
+    if device_info:
+        tags = device_info.get("tags", [])
+        routes = device_info.get("routes", {})
+        adv = routes.get("advertisedRoutes", []) if isinstance(routes, dict) else []
+        enabled = routes.get("enabledRoutes", []) if isinstance(routes, dict) else []
+
+        extra = []
+        if tags:
+            tag_chips = []
+            for t in tags[:4]:
+                tag_chips.append(ft.Container(
+                    content=ft.Text(t, size=9),
+                    padding=ft.Padding(left=4, top=1, right=4, bottom=1),
+                    border_radius=4,
+                    bgcolor=ft.Colors.with_opacity(0.12, ft.Colors.CYAN),
+                ))
+            if len(tags) > 4:
+                tag_chips.append(ft.Text(f"+{len(tags)-4}", size=9, color=ft.Colors.GREY_500))
+            extra.append(ft.Row(tag_chips, spacing=4, wrap=True))
+
+        if adv:
+            extra.append(ft.Text(f"{len(adv)} route{'s' if len(adv)!=1 else ''} advertised", size=10, color=ft.Colors.GREY_500))
+
+        if extra:
+            body.controls.append(
+                ft.Container(
+                    content=ft.Column(extra, spacing=4),
+                    padding=ft.Padding(left=0, top=4, right=0, bottom=0),
+                )
+            )
+
+        actions = []
+        authorized = device_info.get("authorized", True)
+        if on_authorize:
+            actions.append(ft.IconButton(
+                icon=ft.Icons.VERIFIED if authorized else ft.Icons.VERIFIED_OUTLINED,
+                icon_size=16, height=28, width=28,
+                tooltip="Authorized" if authorized else "Not authorized",
+                on_click=on_authorize,
+            ))
+        if on_expire_key:
+            actions.append(ft.IconButton(
+                icon=ft.Icons.KEY_OFF, icon_size=16, height=28, width=28,
+                tooltip="Expire device key",
+                on_click=on_expire_key,
+            ))
+        if on_edit_tags and tags:
+            actions.append(ft.IconButton(
+                icon=ft.Icons.LABEL, icon_size=16, height=28, width=28,
+                tooltip="Edit tags",
+                on_click=on_edit_tags,
+            ))
+
+        if actions:
+            body.controls.append(
+                ft.Container(
+                    content=ft.Row(actions, spacing=2),
+                    padding=ft.Padding(left=0, top=4, right=0, bottom=0),
+                )
+            )
 
     return ft.Container(
         content=body,

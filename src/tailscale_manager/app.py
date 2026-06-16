@@ -1,5 +1,7 @@
 import flet as ft
 
+from .api_client import TailscaleAPIClient
+from .config import load as load_config
 from .constants import NAV_ITEMS, ROUTES
 from .tailscale_cli import TailscaleCLI, get_tailscale_path
 from .views.dashboard import DashboardView
@@ -8,6 +10,13 @@ from .views.exit_nodes import ExitNodesView
 from .views.serve_funnel import ServeFunnelView
 from .views.settings import SettingsView
 from .views.acls import ACLsView
+from .views.auth_keys import AuthKeysView
+from .views.dns import DNSView
+from .views.users import UsersView
+from .views.webhooks import WebhooksView
+from .views.audit_logs import AuditLogsView
+from .views.tailnet_settings import TailnetSettingsView
+from .views.device_posture import DevicePostureView
 
 
 def main(page: ft.Page):
@@ -34,16 +43,25 @@ def main(page: ft.Page):
     )
 
     cli = TailscaleCLI(tailscale_path=get_tailscale_path())
+    cfg = load_config()
+    api = TailscaleAPIClient(cfg["api_key"], cfg["tailnet"])
     nav_rail_ref = ft.Ref[ft.NavigationRail]()
     content_area = ft.Container(expand=True, padding=20)
 
     views = {
-        ROUTES["dashboard"]: DashboardView(cli),
-        ROUTES["peers"]: PeersView(cli),
-        ROUTES["exit_nodes"]: ExitNodesView(cli),
-        ROUTES["serve"]: ServeFunnelView(cli),
-        ROUTES["settings"]: SettingsView(cli),
-        ROUTES["acls"]: ACLsView(cli),
+        ROUTES["dashboard"]: DashboardView(cli, api=api),
+        ROUTES["peers"]: PeersView(cli, api=api),
+        ROUTES["exit_nodes"]: ExitNodesView(cli, api=api),
+        ROUTES["serve"]: ServeFunnelView(cli, api=api),
+        ROUTES["settings"]: SettingsView(cli, api=api),
+        ROUTES["acls"]: ACLsView(cli, api=api),
+        ROUTES["auth_keys"]: AuthKeysView(cli, api=api),
+        ROUTES["dns"]: DNSView(cli, api=api),
+        ROUTES["users"]: UsersView(cli, api=api),
+        ROUTES["webhooks"]: WebhooksView(cli, api=api),
+        ROUTES["audit_logs"]: AuditLogsView(cli, api=api),
+        ROUTES["tailnet_settings"]: TailnetSettingsView(cli, api=api),
+        ROUTES["device_posture"]: DevicePostureView(cli, api=api),
     }
 
     def _navigate(route: str):

@@ -1,4 +1,7 @@
+import threading
 import flet as ft
+from ..api_client import TailscaleAPIClient, TailscaleAPIError
+from ..config import load as load_config
 from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
 from ..widgets.status_card import status_card
 
@@ -11,9 +14,10 @@ _WARN = "#FFB74D"
 
 
 class DashboardView(ft.Column):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True, spacing=12)
         self.cli = cli
+        self.api = api
 
     def did_mount(self):
         pass
@@ -82,13 +86,15 @@ class DashboardView(ft.Column):
                     )
                 )
 
+            row3 = ft.Row(spacing=10, expand=True)
             self.controls = [
                 ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
                 ft.Text("Tailscale connection overview", size=13, color=_GREY),
                 ft.Divider(height=20, color=_BORDER),
-                row1, actions, row2, health,
+                row1, actions, row2, row3, health,
             ]
             self.update()
+            self._load_api_stats(row3)
         except TailscaleCLIError as e:
             self.controls = [
                 ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
@@ -105,6 +111,34 @@ class DashboardView(ft.Column):
                 )
             ]
             self.update()
+
+    def _load_api_stats(self, row3: ft.Row):
+        def _worker():
+            api = self.api
+            if not api or not api.authenticated:
+                cfg = load_config()
+                if not cfg.get("api_key"):
+                    return
+                api = TailscaleAPIClient(cfg["api_key"], cfg.get("tailnet", ""))
+
+            try:
+                keys = api.get_keys()
+                users = api.list_users()
+                prefs = api.get_dns_preferences()
+                magic_dns = prefs.get("magicDNS", prefs.get("magicDns", "?"))
+
+                cards = [
+                    status_card("Auth Keys", str(len(keys)), icon=ft.Icons.KEY),
+                    status_card("Users", str(len(users)), icon=ft.Icons.PEOPLE),
+                    status_card("MagicDNS (API)", "On" if magic_dns is True else "Off",
+                                icon=ft.Icons.DNS, status="online" if magic_dns else "offline"),
+                ]
+                row3.controls = cards
+                self.update()
+            except TailscaleAPIError:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _run_action(self, action: str):
         try:

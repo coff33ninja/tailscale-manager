@@ -56,6 +56,10 @@ class TailscaleAPIClient:
             cleaned = _strip_hujson(resp.text)
             return httpx.Response(200, text=cleaned).json()
 
+    def reconfigure(self, api_key: str, tailnet: str = ""):
+        self._auth = (api_key, "")
+        self._tailnet = tailnet
+
     @property
     def authenticated(self) -> bool:
         return bool(self._auth[0])

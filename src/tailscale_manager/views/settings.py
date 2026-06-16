@@ -1,17 +1,22 @@
 import flet as ft
+from ..api_client import TailscaleAPIClient
+from ..config import load as load_config, save as save_config
 from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
 
 
 class SettingsView(ft.Container):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True)
         self.cli = cli
+        self.api = api
 
         self.accept_routes = ft.Ref[ft.Switch]()
         self.accept_dns = ft.Ref[ft.Switch]()
         self.ssh = ft.Ref[ft.Switch]()
         self.advertise_routes = ft.Ref[ft.TextField]()
         self.advertise_tags = ft.Ref[ft.TextField]()
+        self._api_key_ref = ft.Ref[ft.TextField]()
+        self._tailnet_ref = ft.Ref[ft.TextField]()
 
         self.content = ft.Column(
             [
@@ -20,6 +25,7 @@ class SettingsView(ft.Container):
                 ft.Divider(height=16),
                 ft.Column(
                     [
+                        self._api_section(),
                         self._section("Connection", [
                             self._switch_tile("Accept Routes", "Accept subnet routes advertised by other devices",
                                               self.accept_routes),
@@ -57,6 +63,59 @@ class SettingsView(ft.Container):
             ],
             spacing=4,
         )
+
+    def did_mount(self):
+        self._load_saved_api()
+
+    def _api_section(self) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("API Credentials", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_300),
+                    ft.Text("Used for ACLs, device management, DNS, keys, and more", size=11, color=ft.Colors.GREY_500),
+                    ft.Row(
+                        [
+                            ft.TextField(ref=self._api_key_ref, label="Tailscale API Key",
+                                         hint_text="tskey-api-xxxxx...", password=True, can_reveal_password=True,
+                                         width=400, on_submit=lambda _: self._save_api_creds()),
+                            ft.TextField(ref=self._tailnet_ref, label="Tailnet ID",
+                                         hint_text="your-tailnet.ts.net", width=300,
+                                         on_submit=lambda _: self._save_api_creds()),
+                            ft.FilledButton("Save", icon=ft.Icons.SAVE, on_click=lambda _: self._save_api_creds()),
+                        ],
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                    ),
+                ],
+                spacing=6,
+            ),
+            padding=15,
+            border_radius=10,
+            bgcolor=ft.Colors.with_opacity(0.04, ft.Colors.WHITE),
+            border=ft.Border(top=ft.BorderSide(0.5, ft.Colors.with_opacity(0.06, ft.Colors.WHITE)), right=ft.BorderSide(0.5, ft.Colors.with_opacity(0.06, ft.Colors.WHITE)), bottom=ft.BorderSide(0.5, ft.Colors.with_opacity(0.06, ft.Colors.WHITE)), left=ft.BorderSide(0.5, ft.Colors.with_opacity(0.06, ft.Colors.WHITE))),
+        )
+
+    def _save_api_creds(self):
+        key = (self._api_key_ref.current.value or "").strip()
+        tailnet = (self._tailnet_ref.current.value or "").strip()
+        if not key:
+            self._snack("API key is required", ft.Colors.RED_800)
+            return
+        if not tailnet:
+            self._snack("Tailnet ID is required", ft.Colors.RED_800)
+            return
+        save_config(key, tailnet)
+        if self.api:
+            self.api.reconfigure(key, tailnet)
+        else:
+            self.api = TailscaleAPIClient(key, tailnet)
+        self._snack("API credentials saved", ft.Colors.GREEN_800)
+
+    def _load_saved_api(self):
+        cfg = load_config()
+        if cfg["api_key"]:
+            self._api_key_ref.current.value = cfg["api_key"]
+            self._tailnet_ref.current.value = cfg.get("tailnet", "")
 
     def _section(self, title: str, controls: list) -> ft.Container:
         return ft.Container(

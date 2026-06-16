@@ -4,9 +4,10 @@ from ..tailscale_cli import ServeConfig
 
 
 class ServeFunnelView(ft.Container):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True)
         self.cli = cli
+        self.api = api
         self._mode = "serve"
         self.serve_list_ref = ft.Ref[ft.Column]()
         self.funnel_list_ref = ft.Ref[ft.Column]()

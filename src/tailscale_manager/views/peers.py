@@ -9,12 +9,14 @@ from ..services import scan_peer, open_service
 
 
 class PeersView(ft.Container):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True)
         self.cli = cli
+        self.api = api
         self._search_query = ""
         self._peer_services: dict[str, list[dict]] = {}
         self._peer_acls: dict[str, list[dict]] = {}
+        self._peer_device_details: dict[str, dict] = {}
         self._self_info: dict | None = None
 
         self.search_ref = ft.Ref[ft.TextField]()
@@ -60,6 +62,7 @@ class PeersView(ft.Container):
             self._self_info = status.self_info
             self._render(self._all_devices())
             self._load_acls_async()
+            self._load_device_details_async()
         except TailscaleCLIError as e:
             self._show_error(e)
 
@@ -81,11 +84,12 @@ class PeersView(ft.Container):
         self.list_ref.current.update()
 
     def _load_acls_async(self):
-        cfg = load_config()
-        api_key = cfg.get("api_key", "")
-        tailnet = cfg.get("tailnet", "")
-        if not api_key or not tailnet:
-            return
+        api = self.api
+        if not api or not api.authenticated:
+            cfg = load_config()
+            if not cfg.get("api_key"):
+                return
+            api = TailscaleAPIClient(cfg["api_key"], cfg.get("tailnet", ""))
 
         page = self.page
         if page:
@@ -94,7 +98,6 @@ class PeersView(ft.Container):
             page.update()
 
         def _worker():
-            api = TailscaleAPIClient(api_key, tailnet)
             resolver = ACLResolver(api)
             resolver.fetch()
             if not resolver.loaded:
@@ -106,6 +109,37 @@ class PeersView(ft.Container):
                 if acls:
                     self._peer_acls[ip] = acls
             if self._peer_acls:
+                all_dev = self._all_devices()
+                self._render(
+                    all_dev
+                    if not self._search_query
+                    else [p for p in all_dev if self._search_query in p["name"].lower()]
+                )
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _load_device_details_async(self):
+        api = self.api
+        if not api or not api.authenticated:
+            cfg = load_config()
+            if not cfg.get("api_key"):
+                return
+            api = TailscaleAPIClient(cfg["api_key"], cfg.get("tailnet", ""))
+
+        def _worker():
+            for p in self._all_devices():
+                pid = p.get("id", "")
+                if not pid:
+                    continue
+                try:
+                    detail = api.get_device(pid)
+                    routes = api.get_device_routes(pid)
+                    detail["routes"] = routes
+                    self._peer_device_details[pid] = detail
+                except Exception:
+                    pass
+            if self._peer_device_details:
                 all_dev = self._all_devices()
                 self._render(
                     all_dev
@@ -208,8 +242,10 @@ class PeersView(ft.Container):
             tiles = []
             for p in plist:
                 ip = p.get("ip", [""])[0]
+                pid = p.get("id", "")
                 svcs = self._peer_services.get(ip)
                 acls = self._peer_acls.get(ip)
+                dev = self._peer_device_details.get(pid)
                 tiles.append(
                     peer_tile(
                         p,
@@ -217,6 +253,10 @@ class PeersView(ft.Container):
                         on_click=lambda _, addr=ip: self._ping(addr),
                         on_open_service=open_service,
                         acls=acls,
+                        device_info=dev,
+                        on_authorize=(lambda _, d=pid: self._toggle_authorize(d)) if dev else None,
+                        on_expire_key=(lambda _, d=pid: self._expire_key(d)) if dev else None,
+                        on_edit_tags=(lambda _, d=pid: self._edit_tags_dialog(d)) if dev else None,
                     )
                 )
             return tiles
@@ -257,6 +297,66 @@ class PeersView(ft.Container):
             *controls,
         ]
         self.list_ref.current.update()
+
+    def _toggle_authorize(self, device_id: str):
+        api = self.api or TailscaleAPIClient(**load_config())
+        detail = self._peer_device_details.get(device_id, {})
+        new_val = not detail.get("authorized", True)
+        try:
+            api.authorize_device(device_id, new_val)
+            self._snack(f"Device {'authorized' if new_val else 'deauthorized'}", ft.Colors.GREEN_800)
+            self.load()
+        except TailscaleAPIError as e:
+            self._snack(str(e), ft.Colors.RED_800)
+
+    def _expire_key(self, device_id: str):
+        api = self.api or TailscaleAPIClient(**load_config())
+        try:
+            api.expire_device_key(device_id)
+            self._snack("Device key expired", ft.Colors.GREEN_800)
+        except TailscaleAPIError as e:
+            self._snack(str(e), ft.Colors.RED_800)
+
+    def _edit_tags_dialog(self, device_id: str):
+        detail = self._peer_device_details.get(device_id, {})
+        current = ", ".join(detail.get("tags", []))
+        tf = ft.TextField(label="Tags (comma-separated, e.g. tag:server, tag:prod)",
+                           value=current, multiline=False, width=400)
+        dlg = ft.AlertDialog(
+            title=ft.Text("Edit Device Tags"),
+            content=tf,
+            actions=[
+                ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
+                ft.FilledButton("Save", on_click=lambda _: self._save_tags(device_id, tf.value, dlg)),
+            ],
+        )
+        if self.page:
+            self.page.dialog = dlg
+            dlg.open = True
+            self.page.update()
+
+    def _save_tags(self, device_id: str, raw: str, dlg: ft.AlertDialog):
+        tags = [t.strip() for t in raw.split(",") if t.strip()]
+        api = self.api or TailscaleAPIClient(**load_config())
+        try:
+            api.set_device_tags(device_id, tags)
+            dlg.open = False
+            self.page.update()
+            self._snack("Tags updated", ft.Colors.GREEN_800)
+            self.load()
+        except TailscaleAPIError as e:
+            self._snack(str(e), ft.Colors.RED_800)
+
+    def _close_dialog(self, dlg: ft.AlertDialog):
+        dlg.open = False
+        if self.page:
+            self.page.update()
+
+    def _snack(self, msg: str, color: str):
+        if self.page:
+            self.page.snack_bar = ft.SnackBar(ft.Text(msg, size=13), bgcolor=color)
+            self.page.snack_bar.open = True
+            self.page.update()
 
     def _ping(self, ip: str):
         try:

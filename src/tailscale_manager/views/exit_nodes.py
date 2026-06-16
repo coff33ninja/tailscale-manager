@@ -3,9 +3,10 @@ from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
 
 
 class ExitNodesView(ft.Container):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True)
         self.cli = cli
+        self.api = api
         self.list_ref = ft.Ref[ft.Column]()
 
         self.content = ft.Column(

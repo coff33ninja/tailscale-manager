@@ -8,10 +8,10 @@ from ..tailscale_cli import TailscaleCLI
 
 
 class ACLsView(ft.Container):
-    def __init__(self, cli: TailscaleCLI):
+    def __init__(self, cli: TailscaleCLI, api=None):
         super().__init__(expand=True)
         self.cli = cli
-        self._api: TailscaleAPIClient | None = None
+        self._api: TailscaleAPIClient | None = api
         self._etag = ""
 
         self.editor_ref = ft.Ref[ft.TextField]()
@@ -109,17 +109,11 @@ class ACLsView(ft.Container):
 
     def _load_saved_config(self):
         cfg = load_config()
-        if cfg["api_key"] and cfg["tailnet"]:
-            self.api_key_ref.current.value = cfg["api_key"]
-            self.tailnet_ref.current.value = cfg["tailnet"]
-            self._init_api(cfg["api_key"], cfg["tailnet"])
-            self.update()
+        self.api_key_ref.current.value = cfg["api_key"]
+        self.tailnet_ref.current.value = cfg.get("tailnet", "")
+        self.update()
+        if self._api and self._api.authenticated:
             self._fetch_acl()
-        elif cfg["api_key"]:
-            self.api_key_ref.current.value = cfg["api_key"]
-            self.tailnet_ref.current.value = cfg.get("tailnet", "")
-            self._init_api(cfg["api_key"], cfg.get("tailnet", ""))
-            self.update()
         else:
             self._show_idle()
 
@@ -137,11 +131,13 @@ class ACLsView(ft.Container):
         self._snack("Credentials saved", ft.Colors.GREEN_800)
 
     def _init_api(self, api_key: str, tailnet: str):
-        if api_key.startswith("tskey-"):
-            self._api = TailscaleAPIClient(api_key, tailnet)
-        else:
-            self._api = None
+        if not api_key.startswith("tskey-"):
             self._snack("Invalid API key format (must start with tskey-)", ft.Colors.RED_800)
+            return
+        if self._api:
+            self._api.reconfigure(api_key, tailnet)
+        else:
+            self._api = TailscaleAPIClient(api_key, tailnet)
 
     def _fetch_acl(self):
         if not self._api or not self._api.authenticated:
