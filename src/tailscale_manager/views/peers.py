@@ -11,6 +11,7 @@ class PeersView(ft.Container):
         self.cli = cli
         self._search_query = ""
         self._peer_services: dict[str, list[dict]] = {}
+        self._self_info: dict | None = None
 
         self.search_ref = ft.Ref[ft.TextField]()
         self.list_ref = ft.Ref[ft.Column]()
@@ -51,54 +52,91 @@ class PeersView(ft.Container):
         try:
             status = self.cli.status()
             self._all_peers = status.peers
-            self._render(self._all_peers)
+            self._self_info = {
+                "id": "",
+                "name": status.device_name.split(".")[0] if "." in status.device_name else status.device_name,
+                "dns_name": status.device_name,
+                "ip": status.tailscale_ip,
+                "os": "",
+                "online": True,
+                "relay": "",
+                "rx_bytes": 0,
+                "tx_bytes": 0,
+                "latency": {},
+                "in_network_map": False,
+                "last_seen": "",
+                "exit_node": False,
+                "exit_node_allow": False,
+            }
+            self._render(self._all_devices())
         except TailscaleCLIError as e:
             self._show_error(e)
 
     def _filter(self, query: str):
         self._search_query = query.lower()
-        filtered = [p for p in self._all_peers if self._search_query in p["name"].lower() or any(self._search_query in ip for ip in p.get("ip", []))]
+        filtered = [p for p in self._all_devices() if self._search_query in p["name"].lower() or any(self._search_query in ip for ip in p.get("ip", []))]
         self._render(filtered)
 
     def _scan_all(self):
-        online = [p for p in self._all_peers if p.get("online")]
-        if not online:
-            page = self.page
-            if page:
-                page.snack_bar = ft.SnackBar(ft.Text("No online peers to scan"), duration=2000)
-                page.snack_bar.open = True
-                page.update()
-            return
+        online = [p for p in self._all_devices() if p.get("online")]
 
         page = self.page
-        if page:
-            page.snack_bar = ft.SnackBar(ft.Text(f"Scanning {len(online)} peer(s)..."), duration=5000)
+        if not page:
+            return
+
+        targets = list(online)
+        if not targets:
+            page.snack_bar = ft.SnackBar(ft.Text("No online targets to scan"), duration=2000)
+            page.snack_bar.open = True
+            page.update()
+            return
+
+        # Show scanning indicator inline
+        self.list_ref.current.controls = [
+            ft.ProgressRing(width=24, height=24),
+            ft.Text(f"Scanning {len(targets)} target(s)...", color=ft.Colors.GREY_500),
+        ]
+        page.update()
+
+        def _scan_worker():
+            found_count = 0
+            for t in targets:
+                ip = t.get("ip", [""])[0]
+                if not ip:
+                    continue
+                try:
+                    svcs = scan_peer(ip, 1.0)
+                    if svcs:
+                        self._peer_services[ip] = svcs
+                        found_count += len(svcs)
+                except Exception:
+                    pass
+
+            if found_count:
+                msg = f"Found {found_count} service(s) on {len(self._peer_services)} device(s)"
+            else:
+                msg = "No services found"
+
+            # Re-render from the scan thread — all controls are already materialized
+            all_devices = self._all_devices()
+            self._render(
+                all_devices
+                if not self._search_query
+                else [p for p in all_devices if self._search_query in p["name"].lower()]
+            )
+
+            page.snack_bar = ft.SnackBar(ft.Text(msg), duration=4000)
             page.snack_bar.open = True
             page.update()
 
-        def _scan():
-            with ThreadPoolExecutor(max_workers=min(len(online), 10)) as pool:
-                fut_map = {}
-                for p in online:
-                    ip = p.get("ip", [""])[0]
-                    if ip:
-                        fut = pool.submit(scan_peer, ip, 0.8)
-                        fut_map[fut] = (ip, p)
-
-                from concurrent.futures import as_completed
-                for f in as_completed(fut_map):
-                    ip, p = fut_map[f]
-                    try:
-                        svcs = f.result()
-                        if svcs:
-                            self._peer_services[ip] = svcs
-                    except Exception:
-                        pass
-
-            self._render(self._all_peers if not self._search_query else [p for p in self._all_peers if self._search_query in p["name"].lower()])
-
         import threading
-        threading.Thread(target=_scan, daemon=True).start()
+        threading.Thread(target=_scan_worker, daemon=True).start()
+
+    def _all_devices(self) -> list[dict]:
+        devices = list(self._all_peers)
+        if self._self_info:
+            devices.insert(0, self._self_info)
+        return devices
 
     def _render(self, peers: list[dict]):
         if not peers:
