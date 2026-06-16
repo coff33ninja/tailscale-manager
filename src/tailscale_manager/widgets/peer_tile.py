@@ -1,4 +1,5 @@
 import flet as ft
+from datetime import datetime, timezone
 from ..constants import STATUS_COLORS
 
 
@@ -12,6 +13,28 @@ def _format_bytes(b: int) -> str:
     return f"{b/1024**3:.1f} GB"
 
 
+def _relative_time(ts: str) -> str:
+    if not ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        diff = now - dt
+        days = diff.days
+        seconds = diff.seconds
+        if days > 30:
+            return f"{days // 30}mo ago"
+        elif days > 0:
+            return f"{days}d ago"
+        elif seconds >= 3600:
+            return f"{seconds // 3600}h ago"
+        elif seconds >= 60:
+            return f"{seconds // 60}m ago"
+        return "just now"
+    except Exception:
+        return ts
+
+
 def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_service=None) -> ft.Container:
     is_online = peer.get("online", False)
     status = "online" if is_online else "offline"
@@ -22,6 +45,7 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
     latency = peer.get("latency", {})
 
     lat_ms = ""
+    relay = peer.get("relay", "")
     for val in latency.values():
         if isinstance(val, dict) and "latency" in val:
             lat_ms = f"{val['latency']:.0f}ms"
@@ -32,11 +56,60 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
         peer.get("os", "").lower(), "DEVICE_UNKNOWN"
     )
 
+    exit_node = peer.get("exit_node", False)
+    exit_node_allow = peer.get("exit_node_allow", False)
+    in_network = peer.get("in_network_map", True)
+    last_seen = peer.get("last_seen", "")
+    peer_id = peer.get("id", "")
+
+    name_parts = [ft.Text(peer.get("name", ""), size=15, weight=ft.FontWeight.W_600)]
+
+    if exit_node:
+        label = "Exit Node"
+        if exit_node_allow:
+            label += " (LAN)"
+        name_parts.append(
+            ft.Container(
+                content=ft.Text(label, size=9, color=ft.Colors.AMBER_300),
+                padding=ft.Padding(left=6, top=2, right=6, bottom=2),
+                border_radius=6,
+                bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.AMBER),
+            )
+        )
+
+    if not in_network:
+        name_parts.append(
+            ft.Icon(ft.Icons.WARNING_AMBER, size=14, color=ft.Colors.AMBER_400, tooltip="Not in network map")
+        )
+
+    name_parts.append(ft.Container(width=8, height=8, border_radius=4, bgcolor=dot_color))
+
+    name_row = ft.Row(name_parts, spacing=6)
+
+    relay_lat = ""
+    if is_online:
+        parts = []
+        if relay:
+            parts.append(relay)
+        if lat_ms:
+            parts.append(lat_ms)
+        relay_lat = " \u00b7 ".join(parts) if parts else ""
+    else:
+        relay_lat = _relative_time(last_seen)
+
+    info_row = ft.Row(
+        [
+            ft.Text(ip_str, size=12, color=ft.Colors.GREY_400, expand=True),
+            ft.Text(relay_lat, size=11, color=ft.Colors.GREY_500),
+        ],
+        spacing=4,
+    )
+
     service_row = ft.Row(spacing=6, wrap=True) if services else None
     if services:
         for svc in services:
             btn = ft.IconButton(
-                icon=svc.get("icon", "DNS"),
+                icon=svc.get("icon", ft.Icons.DNS),
                 tooltip=f"{svc['name']} ({svc['port']})",
                 icon_size=18,
                 height=30,
@@ -45,27 +118,24 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
             )
             service_row.controls.append(btn)
 
+    os_icon_container = ft.Container(
+        content=ft.Icon(os_icon, size=22, color=ft.Colors.GREY_300),
+        width=44, height=44,
+        border_radius=22,
+        bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.GREY),
+        alignment=ft.Alignment.CENTER,
+        tooltip=peer_id if peer_id else None,
+    )
+
     body = ft.Column(
         [
             ft.Row(
                 [
-                    ft.Container(
-                        content=ft.Icon(os_icon, size=22, color=ft.Colors.GREY_300),
-                        width=44, height=44,
-                        border_radius=22,
-                        bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.GREY),
-                        alignment=ft.Alignment.CENTER,
-                    ),
+                    os_icon_container,
                     ft.Column(
                         [
-                            ft.Row(
-                                [
-                                    ft.Text(peer.get("name", ""), size=15, weight=ft.FontWeight.W_600),
-                                    ft.Container(width=8, height=8, border_radius=4, bgcolor=dot_color),
-                                ],
-                                spacing=6,
-                            ),
-                            ft.Text(ip_str, size=12, color=ft.Colors.GREY_400),
+                            name_row,
+                            info_row,
                         ],
                         spacing=2,
                         expand=True,
@@ -76,7 +146,6 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
                                 f"\u2193 {_format_bytes(rx)}  \u2191 {_format_bytes(tx)}",
                                 size=11, color=ft.Colors.GREY_400,
                             ),
-                            ft.Text(lat_ms, size=11, color=ft.Colors.GREY_500),
                         ],
                         spacing=2,
                         horizontal_alignment=ft.CrossAxisAlignment.END,
