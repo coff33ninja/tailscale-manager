@@ -1,6 +1,6 @@
 # Tailscale Manager
 
-A full-featured cross-platform desktop GUI for managing [Tailscale](https://tailscale.com) mesh VPN networks, built with [Flet](https://flet.dev) (Python → Flutter). Monitor your tailnet, manage peers, configure exit nodes and Serve/Funnel routes, edit ACL policies, and toggle connection settings — all from a native-looking dark-theme interface.
+A full-featured cross-platform desktop GUI for managing [Tailscale](https://tailscale.com) mesh VPN networks, built with [Flet](https://flet.dev) (Python → Flutter). Monitor your tailnet, manage peers, configure DNS and Auth Keys, edit ACL policies, manage webhooks and users, and toggle connection settings — all from a native-looking dark-theme interface.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -10,13 +10,24 @@ A full-featured cross-platform desktop GUI for managing [Tailscale](https://tail
 
 ## Features
 
+### CLI-powered (works without API key)
 - **Dashboard** — overview of connection status, device info, IPs, version, peer stats, and health warnings
-- **Peers** — browse all tailnet devices with online/offline status, search, and filtering
+- **Peers** — browse all tailnet devices with online/offline sections, search, ACL allowances, exit-node badge, relay info, latency, last-seen, and port-scan service discovery
 - **Exit Nodes** — view and enable/disable exit nodes
 - **Serve / Funnel** — manage Tailscale Serve and Funnel routes
-- **ACLs** — view and edit ACL policies (HuJSON) via the Tailscale API v2
-- **Settings** — configure Tailscale API key and tailnet ID, toggle SSH and subnet routing
 - **Quick actions** — connect/disconnect with one click
+
+### API-powered (requires API key in Settings)
+- **Auth Keys** — list, create (reusable/ephemeral/preauthorized with tags), and revoke
+- **DNS** — 4-tab management: nameservers, MagicDNS preferences, search paths, split DNS routes
+- **ACLs** — view and edit ACL policies (HuJSON) with full tag/user/group/autogroup/CIDR allowance viewer per peer
+- **Users** — list users with avatar/role/status badges, suspend and restore (owner-protected)
+- **Webhooks** — list, create, test, rotate secret, and delete webhook endpoints
+- **Audit Logs** — date-range searchable configuration audit log viewer
+- **Tailnet Settings** — full tailnet settings JSON editor with load/save
+- **Device Posture** — list, create, and delete MDM/compliance posture integrations
+- **Dashboard stats** — auth key count, user count, MagicDNS status row
+- **Peers** — inline tag editing, route display, authorize/deauthorize, key-expiry action
 
 ## Screenshots
 
@@ -27,7 +38,7 @@ A full-featured cross-platform desktop GUI for managing [Tailscale](https://tail
 - Windows (primary target), macOS, or Linux
 - [Tailscale](https://tailscale.com/download) installed and logged in (`tailscale status` must work)
 - Python 3.10+
-- (Optional) A [Tailscale API key](https://login.tailscale.com/admin/settings/keys) for ACL management
+- (Optional) A [Tailscale API key](https://login.tailscale.com/admin/settings/keys) for admin features
 
 ## Getting Started
 
@@ -47,7 +58,7 @@ uv run python -m tailscale_manager
 ### First-time setup
 
 1. Launch the app — basic status works without configuration
-2. For ACL management, go to **Settings** and enter:
+2. For admin features, go to **Settings** and enter:
    - **Tailscale API key** — create at https://login.tailscale.com/admin/settings/keys (read/write)
    - **Tailnet ID** — your tailnet name (e.g. `your-tailnet.ts.net`)
 
@@ -67,21 +78,28 @@ tailscale-manager/
     └── tailscale_manager/
         ├── __init__.py      # Entry point (run function)
         ├── __main__.py      # python -m support
-        ├── app.py           # Flet app shell, nav rail, routing
+        ├── app.py           # Flet app shell, nav rail, routing, shared API client
         ├── tailscale_cli.py # Tailscale CLI wrapper
-        ├── api_client.py    # Tailscale v2 API client (ACLs)
+        ├── api_client.py    # Tailscale v2 API client (~60 endpoints)
         ├── config.py        # API key / tailnet config storage
-        ├── constants.py     # Nav items, status colors
+        ├── constants.py     # Nav items, status colors, routes
         ├── views/
-        │   ├── dashboard.py
-        │   ├── peers.py
-        │   ├── exit_nodes.py
-        │   ├── serve_funnel.py
-        │   ├── acls.py
-        │   └── settings.py
+        │   ├── dashboard.py      # Status overview + API stats
+        │   ├── peers.py          # Device list + tags/routes/auth actions
+        │   ├── exit_nodes.py     # Exit node toggle
+        │   ├── serve_funnel.py   # Serve/Funnel route management
+        │   ├── acls.py           # ACL policy editor
+        │   ├── settings.py       # Connection + API credential management
+        │   ├── auth_keys.py      # Auth key CRUD
+        │   ├── dns.py            # 4-tab DNS configuration
+        │   ├── users.py          # User list + suspend/restore
+        │   ├── webhooks.py       # Webhook endpoints CRUD
+        │   ├── audit_logs.py     # Configuration audit log viewer
+        │   ├── tailnet_settings.py  # Tailnet settings JSON editor
+        │   └── device_posture.py    # Posture integrations CRUD
         └── widgets/
             ├── status_card.py
-            └── peer_tile.py
+            └── peer_tile.py     # Peer tile with tags, routes, action buttons
 ```
 
 ## API Key Storage
@@ -90,6 +108,20 @@ Checked in order:
 1. Environment variables `TAILSCALE_API_KEY` / `TAILSCALE_TAILNET`
 2. `%APPDATA%\tailscale-manager\.env` (or `~/.config/tailscale-manager/.env` on Linux/macOS)
 3. Project root `.env`
+
+The shared API client is created once in `app.py` and passed to all views. Views that need API access fall back to an ad-hoc client if the shared instance is unauthenticated.
+
+## Testing
+
+```bash
+# Run non-destructive integration tests (uses mock server):
+uv run pytest -m "not write_op" -v
+
+# Run all tests including write operations (needs real API key):
+uv run pytest -v
+```
+
+52 integration tests cover the API client with both happy-path and edge-case scenarios (404s, invalid IDs, string boundaries, etc.).
 
 ## Known Issues
 
