@@ -52,9 +52,22 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
             break
 
     ip_str = ", ".join(peer.get("ip", []))
-    os_icon = {"windows": "WINDOWS", "macos": "APPLE", "linux": "TERMINAL", "android": "ANDROID", "ios": "PHONE_IPHONE"}.get(
-        peer.get("os", "").lower(), "DEVICE_UNKNOWN"
-    )
+    os_map = {
+        "windows": (ft.Icons.DESKTOP_WINDOWS, "Windows"),
+        "macos": (ft.Icons.APPLE, "macOS"),
+        "ios": (ft.Icons.PHONE_IPHONE, "iOS"),
+        "ipados": (ft.Icons.TABLET, "iPadOS"),
+        "iphone": (ft.Icons.PHONE_IPHONE, "iPhone"),
+        "ipad": (ft.Icons.TABLET, "iPad"),
+        "tvos": (ft.Icons.TV, "tvOS"),
+        "visionos": (ft.Icons.VISIBILITY, "visionOS"),
+        "android": (ft.Icons.ANDROID, "Android"),
+        "linux": (ft.Icons.TERMINAL, "Linux"),
+        "freebsd": (ft.Icons.TERMINAL, "FreeBSD"),
+        "openbsd": (ft.Icons.TERMINAL, "OpenBSD"),
+    }
+    os_raw = peer.get("os", "").lower()
+    os_icon, os_label = os_map.get(os_raw, (ft.Icons.DEVICE_UNKNOWN, os_raw or "Unknown"))
 
     exit_node = peer.get("exit_node", False)
     exit_node_allow = peer.get("exit_node_allow", False)
@@ -100,10 +113,12 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
 
     info_row = ft.Row(
         [
-            ft.Text(ip_str, size=12, color=ft.Colors.GREY_400, expand=True),
+            ft.Text(ip_str, size=12, color=ft.Colors.GREY_400),
+            ft.Text(f"\u00b7 {os_label}", size=11, color=ft.Colors.GREY_500),
+            ft.Container(expand=True),
             ft.Text(relay_lat, size=11, color=ft.Colors.GREY_500),
         ],
-        spacing=4,
+        spacing=2,
     )
 
     service_row = ft.Row(spacing=6, wrap=True) if services else None
@@ -125,7 +140,7 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
         border_radius=22,
         bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.GREY),
         alignment=ft.Alignment.CENTER,
-        tooltip=peer_id if peer_id else None,
+        tooltip=f"{os_label}\n{peer_id}" if peer_id else os_label,
     )
 
     body = ft.Column(
