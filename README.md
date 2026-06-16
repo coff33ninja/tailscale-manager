@@ -1,9 +1,12 @@
 # Tailscale Manager
 
-A full-featured desktop GUI for managing Tailscale networks, built with [Flet](https://flet.dev).
+A full-featured cross-platform desktop GUI for managing [Tailscale](https://tailscale.com) mesh VPN networks, built with [Flet](https://flet.dev) (Python → Flutter). Monitor your tailnet, manage peers, configure exit nodes and Serve/Funnel routes, edit ACL policies, and toggle connection settings — all from a native-looking dark-theme interface.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey)
+![Flet](https://img.shields.io/badge/built%20with-Flet-00897B)
+![GitHub stars](https://img.shields.io/github/stars/coff33ninja/tailscale-manager?style=social)
 
 ## Features
 
@@ -58,6 +61,7 @@ tailscale-manager/
 ├── pyproject.toml           # Project config + dependencies
 ├── .env.example             # API key template
 ├── .gitignore
+├── known_bugs.md            # Known issues & audit findings
 ├── README.md
 └── src/
     └── tailscale_manager/

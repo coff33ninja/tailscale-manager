@@ -1,13 +1,43 @@
 [project]
 name = "tailscale-manager"
 version = "0.1.0"
-description = "Full-featured Tailscale management GUI built with Flet"
+description = "Full-featured desktop GUI for managing Tailscale networks"
 readme = "README.md"
 requires-python = ">=3.10"
+keywords = [
+    "tailscale",
+    "vpn",
+    "mesh-network",
+    "gui",
+    "flet",
+    "network-management",
+    "tailnet",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "Environment :: MacOS X",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Networking",
+    "Topic :: Desktop Environment",
+]
 dependencies = [
     "flet>=0.25.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/coff33ninja/tailscale-manager"
+Repository = "https://github.com/coff33ninja/tailscale-manager"
+"Bug Tracker" = "https://github.com/coff33ninja/tailscale-manager/issues"
 
 [project.scripts]
 tailscale-manager = "tailscale_manager:run"
