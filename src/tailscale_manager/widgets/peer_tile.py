@@ -95,7 +95,8 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
             parts.append(lat_ms)
         relay_lat = " \u00b7 ".join(parts) if parts else ""
     else:
-        relay_lat = _relative_time(last_seen)
+        rt = _relative_time(last_seen)
+        relay_lat = f"Last seen: {rt}" if rt else ""
 
     info_row = ft.Row(
         [

@@ -142,22 +142,58 @@ class PeersView(ft.Container):
             self.list_ref.current.update()
             return
 
-        tiles = []
-        for p in peers:
-            ip = p.get("ip", [""])[0]
-            svcs = self._peer_services.get(ip)
-            tiles.append(
-                peer_tile(
-                    p,
-                    services=svcs,
-                    on_click=lambda _, addr=ip: self._ping(addr),
-                    on_open_service=open_service,
+        online = [p for p in peers if p.get("online")]
+        offline = [p for p in peers if not p.get("online")]
+
+        def _make_tiles(plist):
+            tiles = []
+            for p in plist:
+                ip = p.get("ip", [""])[0]
+                svcs = self._peer_services.get(ip)
+                tiles.append(
+                    peer_tile(
+                        p,
+                        services=svcs,
+                        on_click=lambda _, addr=ip: self._ping(addr),
+                        on_open_service=open_service,
+                    )
+                )
+            return tiles
+
+        controls: list[ft.Control] = []
+        total = len(peers)
+
+        if online:
+            controls.append(
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.CHECK_CIRCLE, size=14, color=ft.Colors.GREEN_400),
+                        ft.Text(f"Online  {len(online)}", size=13, color=ft.Colors.GREEN_400, weight=ft.FontWeight.W_600),
+                    ],
+                    spacing=6,
                 )
             )
+            controls.append(ft.Divider(height=4, color=ft.Colors.with_opacity(0.08, ft.Colors.GREEN)))
+            controls.extend(_make_tiles(online))
+
+        if offline:
+            if online:
+                controls.append(ft.Divider(height=12, color=ft.Colors.with_opacity(0.04, ft.Colors.WHITE)))
+            controls.append(
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.CANCEL, size=14, color=ft.Colors.GREY_500),
+                        ft.Text(f"Offline  {len(offline)}", size=13, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_600),
+                    ],
+                    spacing=6,
+                )
+            )
+            controls.append(ft.Divider(height=4, color=ft.Colors.with_opacity(0.06, ft.Colors.GREY)))
+            controls.extend(_make_tiles(offline))
 
         self.list_ref.current.controls = [
-            ft.Text(f"{len(peers)} peer{'s' if len(peers) != 1 else ''}", size=12, color=ft.Colors.GREY_500),
-            *tiles,
+            ft.Text(f"{total} device{'s' if total != 1 else ''}", size=12, color=ft.Colors.GREY_500),
+            *controls,
         ]
         self.list_ref.current.update()
 
