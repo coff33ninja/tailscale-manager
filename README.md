@@ -10,24 +10,28 @@ A full-featured cross-platform desktop GUI for managing [Tailscale](https://tail
 
 ## Features
 
-### CLI-powered (works without API key)
+### Works without API key (CLI-powered)
 - **Dashboard** — overview of connection status, device info, IPs, version, peer stats, and health warnings
-- **Peers** — browse all tailnet devices with online/offline sections, search, ACL allowances, exit-node badge, relay info, latency, last-seen, and port-scan service discovery
+- **Peers** — browse all tailnet devices with online/offline sections, search, ACL allowances viewer (tags/users/groups/autogroups/CIDRs), exit-node badge, relay info, latency, last-seen, and port-scan service discovery
 - **Exit Nodes** — view and enable/disable exit nodes
 - **Serve / Funnel** — manage Tailscale Serve and Funnel routes
 - **Quick actions** — connect/disconnect with one click
 
-### API-powered (requires API key in Settings)
-- **Auth Keys** — list, create (reusable/ephemeral/preauthorized with tags), and revoke
-- **DNS** — 4-tab management: nameservers, MagicDNS preferences, search paths, split DNS routes
-- **ACLs** — view and edit ACL policies (HuJSON) with full tag/user/group/autogroup/CIDR allowance viewer per peer
-- **Users** — list users with avatar/role/status badges, suspend and restore (owner-protected)
-- **Webhooks** — list, create, test, rotate secret, and delete webhook endpoints
+### Requires API key (Tailscale v2 HTTP API)
+- **Auth Keys** — list, create (reusable/ephemeral/preauthorized with tag assignment), and revoke keys
+- **DNS** — 4-tab management: nameservers (add/remove), MagicDNS toggle, search paths, and split DNS routes (domain → nameservers)
+- **ACLs** — view and edit ACL policies (HuJSON) via the API, with full allowance resolution per peer; uses the shared API client and calls `reconfigure()` when credentials change
+- **Users** — list users with avatar, role, and status badges; suspend and restore (owner-protected)
+- **Webhooks** — list, create, test, rotate secret, and delete webhook endpoints for tailnet events
 - **Audit Logs** — date-range searchable configuration audit log viewer
-- **Tailnet Settings** — full tailnet settings JSON editor with load/save
+- **Tailnet Settings** — view/edit tailnet-level settings via a full JSON editor (monospace, syntax-validated)
 - **Device Posture** — list, create, and delete MDM/compliance posture integrations
-- **Dashboard stats** — auth key count, user count, MagicDNS status row
-- **Peers** — inline tag editing, route display, authorize/deauthorize, key-expiry action
+
+### Enhanced existing views
+- **Dashboard** — background-fetches auth key count, active user count, and MagicDNS status displayed as a third stat row
+- **Peers** — inline tag editor (comma-separated input dialog), display advertising routes per device, authorize/deauthorize toggle, and key-expiry action button
+- **Peer tiles** (`widgets/peer_tile.py`) — shows tags as colored chips, route count badge, and action buttons for authorized status, key expiry, and tag editing
+- **Settings** — API credential section with Tailscale API key and tailnet ID fields; saves to config and calls `reconfigure()` on the shared client so all views pick up credentials without restarting
 
 ## Screenshots
 
@@ -109,7 +113,7 @@ Checked in order:
 2. `%APPDATA%\tailscale-manager\.env` (or `~/.config/tailscale-manager/.env` on Linux/macOS)
 3. Project root `.env`
 
-The shared API client is created once in `app.py` and passed to all views. Views that need API access fall back to an ad-hoc client if the shared instance is unauthenticated.
+A shared `TailscaleAPIClient` instance is created once in `app.py` and passed to all 12 view constructors. The client was rewritten to cover ~60 Tailscale v2 endpoints (devices, DNS, ACLs, auth keys, users, webhooks, tailnet settings, posture, and audit logs) with proper URL building, error handling, `b'null'` body normalization, and a `reconfigure()` method so credential updates apply to all views at runtime without restarting. Views that need API access fall back to an ad-hoc client if the shared instance is unauthenticated.
 
 ## Testing
 
