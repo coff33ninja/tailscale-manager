@@ -1,6 +1,9 @@
 import flet as ft
 from concurrent.futures import ThreadPoolExecutor
 from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
+from ..api_client import TailscaleAPIClient, TailscaleAPIError
+from ..config import load as load_config
+from ..acl_resolver import ACLResolver
 from ..widgets.peer_tile import peer_tile
 from ..services import scan_peer, open_service
 
@@ -11,6 +14,7 @@ class PeersView(ft.Container):
         self.cli = cli
         self._search_query = ""
         self._peer_services: dict[str, list[dict]] = {}
+        self._peer_acls: dict[str, list[dict]] = {}
         self._self_info: dict | None = None
 
         self.search_ref = ft.Ref[ft.TextField]()
@@ -53,9 +57,33 @@ class PeersView(ft.Container):
             status = self.cli.status()
             self._all_peers = status.peers
             self._self_info = status.self_info
+            self._peer_acls.clear()
             self._render(self._all_devices())
+            self._load_acls()
         except TailscaleCLIError as e:
             self._show_error(e)
+
+    def _load_acls(self):
+        cfg = load_config()
+        api_key = cfg.get("api_key", "")
+        tailnet = cfg.get("tailnet", "")
+        if not api_key or not tailnet:
+            return
+
+        api = TailscaleAPIClient(api_key, tailnet)
+        self._resolver = ACLResolver(api)
+        self._resolver.fetch()
+        if not self._resolver.loaded:
+            return
+
+        for p in self._all_devices():
+            ip = p.get("ip", [""])[0]
+            acls = self._resolver.for_peer(p)
+            if acls:
+                self._peer_acls[ip] = acls
+
+        if self._peer_acls:
+            self._render(self._all_devices() if not self._search_query else [p for p in self._all_devices() if self._search_query in p["name"].lower()])
 
     def _filter(self, query: str):
         self._search_query = query.lower()
@@ -150,12 +178,14 @@ class PeersView(ft.Container):
             for p in plist:
                 ip = p.get("ip", [""])[0]
                 svcs = self._peer_services.get(ip)
+                acls = self._peer_acls.get(ip)
                 tiles.append(
                     peer_tile(
                         p,
                         services=svcs,
                         on_click=lambda _, addr=ip: self._ping(addr),
                         on_open_service=open_service,
+                        acls=acls,
                     )
                 )
             return tiles

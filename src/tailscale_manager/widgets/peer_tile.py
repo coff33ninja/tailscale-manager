@@ -35,7 +35,7 @@ def _relative_time(ts: str) -> str:
         return ts
 
 
-def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_service=None) -> ft.Container:
+def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_service=None, acls: list[dict] | None = None) -> ft.Container:
     is_online = peer.get("online", False)
     status = "online" if is_online else "offline"
     dot_color = STATUS_COLORS[status]
@@ -74,6 +74,26 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
     in_network = peer.get("in_network_map", True)
     last_seen = peer.get("last_seen", "")
     peer_id = peer.get("id", "")
+
+    acl_row = None
+    if acls:
+        chips = []
+        for i, r in enumerate(acls):
+            if i > 4:
+                chips.append(ft.Text(f"+{len(acls)-4}", size=10, color=ft.Colors.GREY_500))
+                break
+            arrow = "\u2192" if r["dir"] == "out" else "\u2190"
+            labels = ", ".join(r.get("dsts", r.get("srcs", [])))
+            color = ft.Colors.GREEN_400 if r["action"] == "accept" else ft.Colors.RED_400
+            chips.append(
+                ft.Container(
+                    content=ft.Text(f"{arrow} {labels}", size=9, color=color),
+                    padding=ft.Padding(left=4, top=1, right=4, bottom=1),
+                    border_radius=4,
+                    bgcolor=ft.Colors.with_opacity(0.12, color),
+                )
+            )
+        acl_row = ft.Row(chips, spacing=4, wrap=True)
 
     name_parts = [ft.Text(peer.get("name", ""), size=15, weight=ft.FontWeight.W_600)]
 
@@ -178,6 +198,14 @@ def peer_tile(peer: dict, services: list | None = None, on_click=None, on_open_s
         body.controls.append(
             ft.Container(
                 content=service_row,
+                padding=ft.Padding(left=0, top=4, right=0, bottom=0),
+            )
+        )
+
+    if acl_row:
+        body.controls.append(
+            ft.Container(
+                content=acl_row,
                 padding=ft.Padding(left=0, top=4, right=0, bottom=0),
             )
         )
