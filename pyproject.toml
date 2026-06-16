@@ -32,6 +32,7 @@ classifiers = [
 dependencies = [
     "flet>=0.25.0",
     "python-dotenv>=1.0.0",
+    "httpx>=0.28.0",
 ]
 
 [project.urls]
@@ -45,6 +46,12 @@ tailscale-manager = "tailscale_manager:run"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
