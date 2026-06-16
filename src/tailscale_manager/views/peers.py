@@ -53,37 +53,68 @@ class PeersView(ft.Container):
         self.load()
 
     def load(self):
+        self._show_loading()
         try:
             status = self.cli.status()
             self._all_peers = status.peers
             self._self_info = status.self_info
-            self._peer_acls.clear()
             self._render(self._all_devices())
-            self._load_acls()
+            self._load_acls_async()
         except TailscaleCLIError as e:
             self._show_error(e)
 
-    def _load_acls(self):
+    def _show_loading(self):
+        self.list_ref.current.controls = [
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.ProgressRing(width=32, height=32),
+                        ft.Text("Loading peers...", color=ft.Colors.GREY_500, size=14),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=12,
+                ),
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
+        ]
+        self.list_ref.current.update()
+
+    def _load_acls_async(self):
         cfg = load_config()
         api_key = cfg.get("api_key", "")
         tailnet = cfg.get("tailnet", "")
         if not api_key or not tailnet:
             return
 
-        api = TailscaleAPIClient(api_key, tailnet)
-        self._resolver = ACLResolver(api)
-        self._resolver.fetch()
-        if not self._resolver.loaded:
-            return
+        page = self.page
+        if page:
+            page.snack_bar = ft.SnackBar(ft.Text("Loading ACL rules..."), duration=10000)
+            page.snack_bar.open = True
+            page.update()
 
-        for p in self._all_devices():
-            ip = p.get("ip", [""])[0]
-            acls = self._resolver.for_peer(p)
-            if acls:
-                self._peer_acls[ip] = acls
+        def _worker():
+            api = TailscaleAPIClient(api_key, tailnet)
+            resolver = ACLResolver(api)
+            resolver.fetch()
+            if not resolver.loaded:
+                return
+            devices = self._all_devices()
+            for p in devices:
+                ip = p.get("ip", [""])[0]
+                acls = resolver.for_peer(p)
+                if acls:
+                    self._peer_acls[ip] = acls
+            if self._peer_acls:
+                all_dev = self._all_devices()
+                self._render(
+                    all_dev
+                    if not self._search_query
+                    else [p for p in all_dev if self._search_query in p["name"].lower()]
+                )
 
-        if self._peer_acls:
-            self._render(self._all_devices() if not self._search_query else [p for p in self._all_devices() if self._search_query in p["name"].lower()])
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _filter(self, query: str):
         self._search_query = query.lower()
