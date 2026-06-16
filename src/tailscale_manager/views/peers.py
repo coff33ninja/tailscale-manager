@@ -52,22 +52,7 @@ class PeersView(ft.Container):
         try:
             status = self.cli.status()
             self._all_peers = status.peers
-            self._self_info = {
-                "id": "",
-                "name": status.device_name.split(".")[0] if "." in status.device_name else status.device_name,
-                "dns_name": status.device_name,
-                "ip": status.tailscale_ip,
-                "os": "",
-                "online": True,
-                "relay": "",
-                "rx_bytes": 0,
-                "tx_bytes": 0,
-                "latency": {},
-                "in_network_map": False,
-                "last_seen": "",
-                "exit_node": False,
-                "exit_node_allow": False,
-            }
+            self._self_info = status.self_info
             self._render(self._all_devices())
         except TailscaleCLIError as e:
             self._show_error(e)

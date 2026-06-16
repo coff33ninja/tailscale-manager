@@ -13,18 +13,38 @@ class TailscaleStatus:
     version: str = ""
     current_user: str = ""
     peers: list[dict] = field(default_factory=list)
+    self_info: dict = field(default_factory=dict)
     magic_dns: bool = False
     health: list[str] = field(default_factory=list)
 
     @classmethod
     def from_json(cls, raw: dict) -> "TailscaleStatus":
         self = cls()
-        self.device_name = raw.get("Self", {}).get("DNSName", "").rstrip(".")
-        self.tailscale_ip = raw.get("Self", {}).get("TailscaleIPs", [])
+        sd = raw.get("Self", {})
+        self.device_name = sd.get("DNSName", "").rstrip(".")
+        self.tailscale_ip = sd.get("TailscaleIPs", [])
         self.version = raw.get("Version", "")
         self.current_user = raw.get("CurrentTailnet", {}).get("Name", "")
         self.magic_dns = raw.get("MagicDNSSuffix", "") != ""
         self.health = raw.get("Health", [])
+
+        self.self_info = {
+            "id": sd.get("ID", ""),
+            "name": self.device_name.split(".")[0] if "." in self.device_name else self.device_name,
+            "dns_name": self.device_name,
+            "ip": self.tailscale_ip,
+            "os": sd.get("OS", ""),
+            "online": sd.get("Online", True),
+            "relay": sd.get("Relay", ""),
+            "rx_bytes": sd.get("RxBytes", 0),
+            "tx_bytes": sd.get("TxBytes", 0),
+            "latency": {},
+            "in_network_map": sd.get("InNetworkMap", True),
+            "last_seen": sd.get("LastSeen", ""),
+            "exit_node": sd.get("ExitNode", False),
+            "exit_node_allow": sd.get("ExitNodeOption", False),
+        }
+
         peers = []
         for key, peer in raw.get("Peer", {}).items():
             name = peer.get("DNSName", "").rstrip(".")
