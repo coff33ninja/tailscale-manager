@@ -29,23 +29,23 @@ class DashboardView(ft.Column):
 
             row1 = ft.Row([
                 status_card("Status", "Connected" if status.online else "Disconnected",
-                            icon="CHECK_CIRCLE" if status.online else "CANCEL",
+                            icon=ft.Icons.CHECK_CIRCLE if status.online else ft.Icons.CANCEL,
                             status="online" if status.online else "offline"),
-                status_card("Device", status.device_name or "N/A", icon="COMPUTER"),
+                status_card("Device", status.device_name or "N/A", icon=ft.Icons.COMPUTER),
                 status_card("Tailscale IPs", status.tailscale_ip[0] if status.tailscale_ip else "N/A",
-                            icon="DNS",
+                            icon=ft.Icons.DNS,
                             subtitle=status.tailscale_ip[1] if len(status.tailscale_ip) > 1 else ""),
-                status_card("Version", status.version or "N/A", icon="BUILD"),
+                status_card("Version", status.version or "N/A", icon=ft.Icons.BUILD),
             ], spacing=10, expand=True)
 
             peers_online = sum(1 for p in status.peers if p["online"])
             row2 = ft.Row([
-                status_card("Total Peers", str(len(status.peers)), icon="PEOPLE"),
-                status_card("Online Peers", str(peers_online), icon="CHECK_CIRCLE", status="online"),
+                status_card("Total Peers", str(len(status.peers)), icon=ft.Icons.PEOPLE),
+                status_card("Online Peers", str(peers_online), icon=ft.Icons.CHECK_CIRCLE, status="online"),
                 status_card("Offline Peers", str(len(status.peers) - peers_online),
-                            icon="CANCEL",
+                            icon=ft.Icons.CANCEL,
                             status="offline" if peers_online < len(status.peers) else "online"),
-                status_card("MagicDNS", "Enabled" if status.magic_dns else "Disabled", icon="DNS"),
+                status_card("MagicDNS", "Enabled" if status.magic_dns else "Disabled", icon=ft.Icons.DNS),
             ], spacing=10, expand=True)
 
             actions = ft.Container(
