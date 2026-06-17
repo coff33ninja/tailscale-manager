@@ -58,3 +58,12 @@ line-length = 100
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tailscale_manager"]
+
+[tool.flet.pack]
+script = "pack.py"
+product-name = "Tailscale Manager"
+file-description = "Full-featured Tailscale network manager"
+company-name = "tailscale-manager"
+copyright = "MIT"
+onedir = true
+hidden-import = ["tailscale_manager"]

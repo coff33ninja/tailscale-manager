@@ -87,11 +87,11 @@ class ServeFunnelView(ft.Container):
         self.serve_list_ref.current.controls = self._build_route_list(config, "serve")
         self.serve_list_ref.current.update()
 
-    def _render_funnel(self, config):
+    def _render_funnel(self, config: ServeConfig):
         self.funnel_list_ref.current.controls = self._build_route_list(config, "funnel")
         self.funnel_list_ref.current.update()
 
-    def _build_route_list(self, config, mode: str):
+    def _build_route_list(self, config: ServeConfig, mode: str) -> list[ft.Control]:
         controls = []
         if not config.routes:
             controls.append(
