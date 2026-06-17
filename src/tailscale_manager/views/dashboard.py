@@ -3,7 +3,6 @@ import flet as ft
 from ..api_client import TailscaleAPIClient, TailscaleAPIError
 from ..config import load as load_config
 from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
-from ..widgets.loading import loading_view
 from ..widgets.status_card import status_card
 
 _RED = "#FF5252"
@@ -19,7 +18,6 @@ class DashboardView(ft.Column):
         super().__init__(expand=True, spacing=12)
         self.cli = cli
         self.api = api
-        self._loaded = False
         self._content_ref = ft.Ref[ft.Column]()
 
         self.controls = [
@@ -34,9 +32,8 @@ class DashboardView(ft.Column):
 
     def load(self):
         content = self._content_ref.current
-        if not self._loaded:
-            content.controls = [loading_view("Loading dashboard...")]
-            content.update()
+        content.controls = [ft.ProgressRing(width=32, height=32)]
+        content.update()
         try:
             status = self.cli.status()
 
@@ -98,7 +95,6 @@ class DashboardView(ft.Column):
             row3 = ft.Row(spacing=10, expand=True)
             content.controls = [row1, actions, row2, row3, health]
             content.update()
-            self._loaded = True
             self._load_api_stats(row3)
         except TailscaleCLIError as e:
             content.controls = [
