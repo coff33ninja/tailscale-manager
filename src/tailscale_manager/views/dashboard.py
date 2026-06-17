@@ -18,16 +18,22 @@ class DashboardView(ft.Column):
         super().__init__(expand=True, spacing=12)
         self.cli = cli
         self.api = api
+        self._content_ref = ft.Ref[ft.Column]()
+
+        self.controls = [
+            ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
+            ft.Text("Tailscale connection overview", size=13, color=_GREY),
+            ft.Divider(height=20, color=_BORDER),
+            ft.Column(ref=self._content_ref, spacing=12, expand=True),
+        ]
 
     def did_mount(self):
         pass
 
     def load(self):
-        self.controls = [
-            ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
-            ft.Text("Loading...", size=13, color=_GREY),
-        ]
-        self.update()
+        content = self._content_ref.current
+        content.controls = [ft.ProgressRing(width=32, height=32)]
+        content.update()
         try:
             status = self.cli.status()
 
@@ -87,19 +93,11 @@ class DashboardView(ft.Column):
                 )
 
             row3 = ft.Row(spacing=10, expand=True)
-            self.controls = [
-                ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
-                ft.Text("Tailscale connection overview", size=13, color=_GREY),
-                ft.Divider(height=20, color=_BORDER),
-                row1, actions, row2, row3, health,
-            ]
-            self.update()
+            content.controls = [row1, actions, row2, row3, health]
+            content.update()
             self._load_api_stats(row3)
         except TailscaleCLIError as e:
-            self.controls = [
-                ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD, color=_WHITE),
-                ft.Text("Tailscale connection overview", size=13, color=_GREY),
-                ft.Divider(height=20, color=_BORDER),
+            content.controls = [
                 ft.Container(
                     content=ft.Column([
                         ft.Icon(ft.Icons.WARNING_AMBER, size=48, color=_WARN),
@@ -110,7 +108,7 @@ class DashboardView(ft.Column):
                     alignment=ft.Alignment.CENTER, expand=True,
                 )
             ]
-            self.update()
+            content.update()
 
     def _load_api_stats(self, row3: ft.Row):
         def _worker():

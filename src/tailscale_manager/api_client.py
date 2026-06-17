@@ -6,20 +6,53 @@ BASE_URL = "https://api.tailscale.com/api/v2"
 
 
 def _strip_hujson(text: str) -> str:
-    text = re.sub(r"(?ms)//.*?$|/\*.*?\*/", "", text)
     result = []
     in_string = False
     escape = False
-    for ch in text:
-        if escape:
-            escape = False
-        elif ch == "\\" and in_string:
-            escape = True
-        elif ch == '"' and not escape:
-            in_string = not in_string
-        if not in_string and ch == "#":
+    in_block = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if in_block:
+            if ch == "*" and i + 1 < len(text) and text[i + 1] == "/":
+                in_block = False
+                i += 2
+                continue
+            i += 1
             continue
+        if escape:
+            result.append(ch)
+            escape = False
+            i += 1
+            continue
+        if ch == "\\" and in_string:
+            result.append(ch)
+            escape = True
+            i += 1
+            continue
+        if ch == '"':
+            in_string = not in_string
+            result.append(ch)
+            i += 1
+            continue
+        if not in_string:
+            n2 = text[i : i + 2]
+            if n2 == "//":
+                i += 2
+                while i < len(text) and text[i] not in "\n\r":
+                    i += 1
+                continue
+            if n2 == "/*":
+                in_block = True
+                i += 2
+                continue
+            if ch == "#":
+                i += 1
+                while i < len(text) and text[i] not in "\n\r":
+                    i += 1
+                continue
         result.append(ch)
+        i += 1
     cleaned = "".join(result)
     cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
     return cleaned
@@ -54,7 +87,10 @@ class TailscaleAPIClient:
             return data if data is not None else {}
         except Exception:
             cleaned = _strip_hujson(resp.text)
-            return httpx.Response(200, text=cleaned).json()
+            try:
+                return httpx.Response(200, text=cleaned).json()
+            except Exception:
+                raise TailscaleAPIError(f"Failed to parse response: {resp.text[:300]}")
 
     def reconfigure(self, api_key: str, tailnet: str = ""):
         self._auth = (api_key, "")
@@ -79,11 +115,8 @@ class TailscaleAPIClient:
         return self._request("POST", "/acl", json=acl, headers=headers)
 
     def validate_acl(self, acl: dict) -> list:
-        try:
-            resp = self._request("POST", "/acl/validate", json=acl)
-            return resp.get("warnings", [])
-        except TailscaleAPIError as e:
-            raise e
+        resp = self._request("POST", "/acl/validate", json=acl)
+        return resp.get("warnings", [])
 
     def preview_acl(self, acl: dict, type: str = "user", preview_for: str = "") -> list:
         if not preview_for:

@@ -91,6 +91,10 @@ class ACLsView(ft.Container):
             self._snack(f"Invalid JSON: {e}", ft.Colors.RED_800)
             return
         try:
+            warnings = api.validate_acl(acl)
+            if warnings:
+                msg = "\n".join(f"  \u2022 {w}" for w in warnings[:5])
+                self._snack(f"Validation warnings:\n{msg}", ft.Colors.AMBER_800)
             api.set_acl(acl, self._etag)
             self._snack("ACL saved successfully", ft.Colors.GREEN_800)
             self._fetch_acl()

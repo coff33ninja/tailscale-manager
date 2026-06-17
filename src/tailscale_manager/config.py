@@ -29,5 +29,4 @@ def save(api_key: str, tailnet: str = "") -> None:
         set_key(env_path, "TAILSCALE_TAILNET", tailnet)
     else:
         unset_key(env_path, "TAILSCALE_TAILNET")
-    os.environ["TAILSCALE_API_KEY"] = api_key
-    os.environ["TAILSCALE_TAILNET"] = tailnet
+

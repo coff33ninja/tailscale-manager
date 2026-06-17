@@ -116,7 +116,7 @@ class ExitNodesView(ft.Container):
     def _enable(self, node: dict):
         try:
             ip = node.get("ip", [""])[0]
-            self.cli.up(exit_node=ip)
+            self.cli.up(exit_node=ip, exit_node_allow=True)
             self.load()
             self._snack(f"Exit node set to {node.get('name', ip)}", ft.Colors.GREEN_800)
         except TailscaleCLIError as e:

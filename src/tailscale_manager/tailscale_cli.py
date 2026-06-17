@@ -81,10 +81,11 @@ class ServeConfig:
     def from_json(cls, raw: dict) -> "ServeConfig":
         self = cls()
         self.enabled = bool(raw)
-        for source_path, target in raw.get("TCP", {}).get("443", {}).items():
-            self.routes.append(
-                {"type": "tcp", "source": source_path, "target": target}
-            )
+        for port, sources in raw.get("TCP", {}).items():
+            for source_path, target in sources.items():
+                self.routes.append(
+                    {"type": "tcp", "source": source_path, "target": target}
+                )
         for source_path, target in raw.get("Web", {}).items():
             for srv in target.get("Handlers", []):
                 self.routes.append(
@@ -129,16 +130,18 @@ class TailscaleCLI:
 
     def up(
         self,
-        accept_routes: bool = False,
-        accept_dns: bool = True,
+        accept_routes: Optional[bool] = None,
+        accept_dns: Optional[bool] = None,
         exit_node: str = "",
         exit_node_allow: bool = True,
         advertise_routes: str = "",
         advertise_tags: str = "",
-        ssh: bool = True,
+        ssh: Optional[bool] = None,
     ) -> str:
-        args = ["up", "--accept-dns=false" if not accept_dns else "--accept-dns"]
-        if accept_routes:
+        args = ["up"]
+        if accept_dns is not None:
+            args.append("--accept-dns" if accept_dns else "--accept-dns=false")
+        if accept_routes is True:
             args.append("--accept-routes")
         if exit_node:
             args.extend(["--exit-node", exit_node])
@@ -148,7 +151,7 @@ class TailscaleCLI:
             args.extend(["--advertise-routes", advertise_routes])
         if advertise_tags:
             args.extend(["--advertise-tags", advertise_tags])
-        if ssh:
+        if ssh is True:
             args.append("--ssh")
         return self._run(*args, timeout=60)
 
@@ -209,6 +212,11 @@ class TailscaleCLI:
 
 
 def get_tailscale_path() -> str:
-    if Path("C:\\Program Files\\Tailscale\\tailscale.exe").exists():
-        return "C:\\Program Files\\Tailscale\\tailscale.exe"
+    candidates = [
+        "C:\\Program Files\\Tailscale\\tailscale.exe",
+        "C:\\Program Files (x86)\\Tailscale\\tailscale.exe",
+    ]
+    for p in candidates:
+        if Path(p).exists():
+            return p
     return "tailscale"

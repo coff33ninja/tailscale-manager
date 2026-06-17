@@ -80,8 +80,8 @@ class ServeFunnelView(ft.Container):
         try:
             config = self.cli.funnel_status()
             self._render_funnel(config)
-        except TailscaleCLIError:
-            self._render_funnel([])
+        except TailscaleCLIError as e:
+            self._render_funnel_error(e)
 
     def _render_serve(self, config: ServeConfig):
         self.serve_list_ref.current.controls = self._build_route_list(config, "serve")
@@ -237,3 +237,22 @@ class ServeFunnelView(ft.Container):
             )
         ]
         self.serve_list_ref.current.update()
+
+    def _render_funnel_error(self, e: Exception):
+        self.funnel_list_ref.current.controls = [
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.ERROR_OUTLINE, size=48, color=ft.Colors.RED_400),
+                        ft.Text("Could not load Funnel config", weight=ft.FontWeight.BOLD),
+                        ft.Text(str(e), color=ft.Colors.GREY_500, text_align=ft.TextAlign.CENTER),
+                        ft.FilledButton("Retry", icon=ft.Icons.REFRESH, on_click=lambda _: self.load()),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=8,
+                ),
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
+        ]
+        self.funnel_list_ref.current.update()
