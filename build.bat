@@ -13,9 +13,9 @@ if %ERRORLEVEL% neq 0 (
     set "PATH=%USERPROFILE%\.local\bin;%PATH%"
 )
 
-:: Sync dependencies
+:: Sync dependencies (including dev group for flet-cli)
 echo [*] Running uv sync ...
-uv sync
+uv sync --group dev
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] uv sync failed.
     pause

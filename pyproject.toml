@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: Desktop Environment",
 ]
 dependencies = [
-    "flet>=0.25.0",
+    "flet[desktop]>=0.25.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.28.0",
 ]
@@ -48,7 +48,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pyinstaller>=6.0"]
+dev = ["pytest>=8.0", "pyinstaller>=6.0", "flet-cli>=0.25.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
