@@ -1,6 +1,7 @@
 import flet as ft
 from ..api_client import TailscaleAPIClient, TailscaleAPIError
 from ..config import load as load_config
+from ..widgets.loading import loading_view
 
 
 class AuthKeysView(ft.Container):
@@ -8,6 +9,7 @@ class AuthKeysView(ft.Container):
         super().__init__(expand=True)
         self.cli = cli
         self.api = api
+        self._loaded = False
         self.list_ref = ft.Ref[ft.Column]()
 
         self.content = ft.Column(
@@ -32,7 +34,8 @@ class AuthKeysView(ft.Container):
         self.load()
 
     def load(self):
-        self._show_loading()
+        if not self._loaded:
+            self._show_loading()
         api = self.api
         if not api or not api.authenticated:
             cfg = load_config()
@@ -43,20 +46,13 @@ class AuthKeysView(ft.Container):
         try:
             keys = api.get_keys()
             keys.sort(key=lambda k: k.get("created", ""), reverse=True)
+            self._loaded = True
             self._render(keys)
         except TailscaleAPIError as e:
             self._show_error(str(e))
 
     def _show_loading(self):
-        self.list_ref.current.controls = [
-            ft.Container(
-                content=ft.Column(
-                    [ft.ProgressRing(width=32, height=32), ft.Text("Loading keys...", color=ft.Colors.GREY_500, size=14)],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=12,
-                ),
-                alignment=ft.Alignment.CENTER, expand=True,
-            )
-        ]
+        self.list_ref.current.controls = [loading_view("Loading keys...")]
         self.list_ref.current.update()
 
     def _render(self, keys: list):

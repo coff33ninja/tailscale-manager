@@ -4,6 +4,7 @@ from ..tailscale_cli import TailscaleCLI, TailscaleCLIError
 from ..api_client import TailscaleAPIClient, TailscaleAPIError
 from ..config import load as load_config
 from ..acl_resolver import ACLResolver
+from ..widgets.loading import loading_view
 from ..widgets.peer_tile import peer_tile
 from ..services import scan_peer, open_service
 
@@ -13,6 +14,7 @@ class PeersView(ft.Container):
         super().__init__(expand=True)
         self.cli = cli
         self.api = api
+        self._loaded = False
         self._search_query = ""
         self._peer_services: dict[str, list[dict]] = {}
         self._peer_acls: dict[str, list[dict]] = {}
@@ -55,32 +57,21 @@ class PeersView(ft.Container):
         self.load()
 
     def load(self):
-        self._show_loading()
+        if not self._loaded:
+            self._show_loading()
         try:
             status = self.cli.status()
             self._all_peers = status.peers
             self._self_info = status.self_info
             self._render(self._all_devices())
+            self._loaded = True
             self._load_acls_async()
             self._load_device_details_async()
         except TailscaleCLIError as e:
             self._show_error(e)
 
     def _show_loading(self):
-        self.list_ref.current.controls = [
-            ft.Container(
-                content=ft.Column(
-                    [
-                        ft.ProgressRing(width=32, height=32),
-                        ft.Text("Loading peers...", color=ft.Colors.GREY_500, size=14),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=12,
-                ),
-                alignment=ft.Alignment.CENTER,
-                expand=True,
-            )
-        ]
+        self.list_ref.current.controls = [loading_view("Loading peers...")]
         self.list_ref.current.update()
 
     def _load_acls_async(self):
