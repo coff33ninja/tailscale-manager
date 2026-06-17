@@ -68,6 +68,41 @@ uv run python -m tailscale_manager
 
 Keys are stored in `%APPDATA%\tailscale-manager\.env` and are never sent anywhere except to the Tailscale API.
 
+## Building a Standalone Executable
+
+### Windows (one-click)
+
+Run `build.bat` — it syncs dependencies, then runs `flet pack` to produce:
+
+```
+dist\tailscale-manager\tailscale-manager.exe
+```
+
+Launch the exe from that directory (double-click or run `dist\tailscale-manager\tailscale-manager.exe`). Do **not** move or run the exe outside its folder — it needs the `_internal/` directory next to it.
+
+### Debugging build issues
+
+If the exe crashes silently, rebuild with console output enabled:
+
+```bash
+.venv\Scripts\flet.exe pack pack.py -n "tailscale-manager" --distpath dist --onedir --hidden-import "tailscale_manager" -y
+```
+
+Console errors (missing imports, runtime tracebacks) will appear in the terminal window.
+
+### Manual build
+
+```bash
+uv sync
+.venv\Scripts\flet.exe pack pack.py ^
+    -n "tailscale-manager" ^
+    --product-name "Tailscale Manager" ^
+    --distpath dist ^
+    --onedir ^
+    --hidden-import "tailscale_manager" ^
+    -y
+```
+
 ## Project Structure
 
 ```
