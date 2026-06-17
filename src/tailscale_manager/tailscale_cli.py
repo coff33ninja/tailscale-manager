@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -99,8 +100,28 @@ class TailscaleCLIError(Exception):
 
 
 class TailscaleCLI:
-    def __init__(self, tailscale_path: str = "tailscale"):
+    def __init__(self, tailscale_path: str = "tailscale", cache_ttl: float = 3.0):
         self._path = tailscale_path
+        self._cache_ttl = cache_ttl
+        self._cache: dict[str, tuple[float, any]] = {}
+
+    def _cache_get(self, key: str):
+        if key in self._cache:
+            ts, val = self._cache[key]
+            if time.monotonic() - ts < self._cache_ttl:
+                return val
+            del self._cache[key]
+        return None
+
+    def _cache_set(self, key: str, val: any):
+        self._cache[key] = (time.monotonic(), val)
+
+    def _cache_clear(self, *keys: str):
+        if not keys:
+            self._cache.clear()
+        else:
+            for k in keys:
+                self._cache.pop(k, None)
 
     def _run(self, *args: str, timeout: int = 15) -> str:
         try:
@@ -125,8 +146,13 @@ class TailscaleCLI:
         return json.loads(out)
 
     def status(self) -> TailscaleStatus:
+        cached = self._cache_get("status")
+        if cached:
+            return cached
         raw = self._run_json("status")
-        return TailscaleStatus.from_json(raw)
+        result = TailscaleStatus.from_json(raw)
+        self._cache_set("status", result)
+        return result
 
     def up(
         self,
@@ -153,9 +179,11 @@ class TailscaleCLI:
             args.extend(["--advertise-tags", advertise_tags])
         if ssh is True:
             args.append("--ssh")
+        self._cache_clear("status")
         return self._run(*args, timeout=60)
 
     def down(self) -> str:
+        self._cache_clear("status")
         return self._run("down")
 
     def logout(self) -> str:
@@ -174,23 +202,39 @@ class TailscaleCLI:
         return self._run_json("netcheck")
 
     def serve_status(self) -> ServeConfig:
+        cached = self._cache_get("serve_status")
+        if cached:
+            return cached
         raw = self._run_json("serve", "status")
-        return ServeConfig.from_json(raw)
+        result = ServeConfig.from_json(raw)
+        self._cache_set("serve_status", result)
+        return result
 
-    def funnel_status(self) -> dict:
+    def funnel_status(self) -> ServeConfig:
+        cached = self._cache_get("funnel_status")
+        if cached:
+            return cached
         raw = self._run_json("funnel", "status")
-        return ServeConfig.from_json(raw)
+        result = ServeConfig.from_json(raw)
+        self._cache_set("funnel_status", result)
+        return result
 
     def serve_set(self, source: str, target: str, on: bool = True) -> str:
         cmd = "on" if on else "off"
-        return self._run("serve", cmd, "--bg", f"https://{source}", f"http://{target}", timeout=30)
+        result = self._run("serve", cmd, "--bg", f"https://{source}", f"http://{target}", timeout=30)
+        self._cache_clear("serve_status")
+        return result
 
     def funnel_set(self, source: str, target: str, on: bool = True) -> str:
         cmd = "on" if on else "off"
-        return self._run("funnel", cmd, "--bg", f"https://{source}", f"http://{target}", timeout=30)
+        result = self._run("funnel", cmd, "--bg", f"https://{source}", f"http://{target}", timeout=30)
+        self._cache_clear("funnel_status")
+        return result
 
     def serve_remove(self, source: str) -> str:
-        return self._run("serve", "off", f"https://{source}")
+        result = self._run("serve", "off", f"https://{source}")
+        self._cache_clear("serve_status")
+        return result
 
     def file_send(self, file_path: str, target_device: str) -> str:
         return self._run("file", "send", file_path, target_device)
