@@ -18,3 +18,7 @@ src.zip
 
 # Stray entry point
 main.py
+
+# PyInstaller artifacts
+*.spec
+build/

@@ -40,7 +40,7 @@ echo [*] Building Tailscale Manager v%VERSION% ...
     --copyright "MIT" ^
     --distpath dist ^
     --onedir ^
-    --add-data "pack.py;." ^
+    --hidden-import "tailscale_manager" ^
     -y
 
 if %ERRORLEVEL% neq 0 (
